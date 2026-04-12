@@ -1,0 +1,26 @@
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Local virtual environments
+.venv/
+venv/
+env/
+
+# Data and generated artifacts
+data/
+models/
+raw/
+results/
+raw.zip
+*.pkl
+*.joblib
+*.pt
+*.mat
+*.log
+
+# IDE files
+.vscode/
+.idea/
