@@ -2,93 +2,91 @@
 
 ## 1. 项目概述
 
-本项目实现了 RSSI 场景下的完整机器学习流水线，包含传统机器学习与 1D CNN 两类模型。
+本项目实现了 RSSI 场景下从数据预处理到模型训练再到可视化推理的完整流程，包含传统机器学习与 1D CNN 两条链路。
 
-- 数据来源: 20 个 `.mat` 文件，变量名为 `RSSI`
-- 单文件规模: `20000 x 52`
-- 总规模: 1,040,000 个时间采样点
-- 任务类型:
-  - 身份分类: 5 人多分类
-  - 身份识别: 未见人员检测（person-disjoint 开放集识别）
+- 数据来源：20 个 MAT 文件（变量名为 RSSI）
+- 单文件规模：约 20000 x 52
+- 任务类型：
+  - 身份分类（多分类）
+  - 身份识别（开放集，包含 Unknown 拒识）
 
-## 2. 流水线步骤
+## 2. 当前进展
+
+- 已统一主流程调用接口（main.py 与 scripts 中的函数名一致）
+- 已完成项目 GitHub 上传
+- 已上传 raw 原始数据目录
+- 已通过 .gitignore 排除 data、models、results 等训练产物，避免仓库膨胀
+
+## 3. 处理与训练流水线
 
 ```text
-原始数据(raw/*.mat)
-    -> [1] 数据集划分 split_rssi_dataset.py
-    -> [2] 滑窗构建 build_sliding_windows.py
-    -> [3] 频域特征 + PCA + 归一化 process_features_pca_norm.py
-    -> [4] 传统模型训练 train_and_validate_models.py
-    -> [5] 1D CNN 训练 train_cnn_models.py
-    -> [5] GUI 可视化 main.py (Streamlit)
+raw/*.mat
+  -> 数据集划分 (scripts/split_rssi_dataset.py)
+  -> 滑窗构建 (scripts/build_sliding_windows.py)
+  -> 频域+统计特征 / PCA / 归一化 (scripts/process_features_pca_norm.py)
+  -> 传统模型训练 (scripts/train_and_validate_models.py)
+  -> CNN 模型训练 (scripts/train_cnn_models.py)
+  -> Web 可视化与推理 (main.py)
 ```
 
-### [1] 数据集划分
+### 3.1 数据划分
 
-- 分类任务划分: `subject_stratified_file_split`
-  - 每个人员在训练集和测试集中都出现
-  - 输出: `data/rssi_split_classification.pkl`
-- 识别任务划分: `person_disjoint_split`
-  - 训练集和测试集人员集合完全不重叠
-  - 测试集只包含训练集中未见过的人员
-  - 输出: `data/rssi_split_identification.pkl`
-- 兼容文件: `data/rssi_split.pkl`（默认指向分类任务划分）
+- 分类任务：subject_stratified_file_split
+  - 每个受试者在训练集和测试集都出现
+  - 输出：data/rssi_split_classification.pkl
+- 识别任务：open_set_known_unknown_split
+  - 先划分 known/unknown 人员
+  - known 人员再按文件划分 train/test
+  - unknown 人员全部进入测试集
+  - 输出：data/rssi_split_identification.pkl
 
-### [2] 滑窗构建
+### 3.2 滑窗构建
 
-- 窗口大小: 200
-- 步长: 100
-- 单文件样本数: 199 个窗口
-- 输出:
-  - 分类: `data/rssi_windowed_classification.pkl`
-  - 识别: `data/rssi_windowed_identification.pkl`
-  - 兼容: `data/rssi_windowed.pkl`
+- 默认窗口大小：200
+- 默认步长：100
+- 输出：
+  - data/rssi_windowed_classification.pkl
+  - data/rssi_windowed_identification.pkl
 
-### [3] 频域特征 + PCA + 归一化
+### 3.3 特征工程
 
-- 特征方式: 200 点窗口的低频 FFT 幅值 + 窗口统计特征（标准差、偏度、峰度、过零率）
-- PCA 开关: 支持启用/关闭
-- PCA 拟合策略: 仅在训练集上拟合，再对测试集 transform
-- PCA: 默认保留 90.19% 方差
-- 归一化: 映射到 `[-1, 1]`
-- 输出:
-  - 分类: `data/rssi_processed_classification.pkl`
-  - 识别: `data/rssi_processed_identification.pkl`
-  - 兼容: `data/rssi_processed.pkl`
+- 频域特征：窗口去均值后 FFT 低频幅值
+- 统计特征：标准差、偏度、峰度、过零率
+- 可选 PCA：默认保留方差 0.9019
+- 归一化：MinMax 映射到 [-1, 1]
+- 输出：
+  - data/rssi_processed_classification.pkl
+  - data/rssi_processed_identification.pkl
 
-### [4] 传统模型训练与评估
+### 3.4 传统模型
 
-- 分类模型: SVM、RandomForest，若环境安装则自动启用 XGBoost / LightGBM
-- 识别模型: One-Class SVM（未见人员检测）
-- 指标: Accuracy、Precision、Recall、F1
-- 输出:
-  - `models/best_classification_model.joblib`
-  - `models/identification_model.joblib`
-  - `results/classification_metrics.json`
-  - `results/identification_metrics.json`
+- 分类：SVM、RandomForest、XGBoost、LightGBM
+- 识别：基于类别中心与距离阈值的开放集识别
+- 指标：Accuracy、Precision、Recall、F1（分类含 CV 指标）
+- 输出：
+  - models/best_classification_model.joblib
+  - models/identification_model.joblib
+  - results/classification_metrics.json
+  - results/identification_metrics.json
 
-### [5] 1D CNN 训练与评估
+### 3.5 1D CNN 模型
 
-- 网络: Conv1d + BN + ReLU + Pool + Dropout
-- 训练策略:
-  - train/val/test 三段式
-  - 按验证集指标选最优权重
-  - 支持早停
-- 分类输出:
-  - `models/cnn_classification.pt`
-  - `results/cnn_classification_metrics.json`
-- 识别输出:
-  - `models/cnn_identification.pt`
-  - `results/cnn_identification_metrics.json`
+- 结构：Conv1d + BN + ReLU + Pool + Dropout + FC
+- 训练：支持验证集、早停、随机种子控制
+- 输出：
+  - models/cnn_classification.pt
+  - models/cnn_identification.pt
+  - results/cnn_classification_metrics.json
+  - results/cnn_identification_metrics.json
 
-## 3. 项目结构
+## 4. 项目结构
 
 ```text
 RSSIML/
-├─ raw/                                # 原始数据
-├─ data/                               # 中间数据
-├─ models/                             # 模型文件
-├─ results/                            # 评估结果
+├─ raw/                                # 原始 MAT 数据（已上传）
+├─ data/                               # 中间数据（默认不提交）
+├─ models/                             # 模型文件（默认不提交）
+├─ results/                            # 评估结果（默认不提交）
 ├─ scripts/
 │  ├─ __init__.py
 │  ├─ config.py
@@ -100,64 +98,71 @@ RSSIML/
 │  ├─ train_cnn_models.py
 │  └─ pipeline_runner.py
 ├─ tests/
-│  ├─ test_pipeline_mock.py            # 传统流程 mock 测试
-│  └─ test_cnn_mock.py                 # CNN mock 测试
-├─ main.py                             # Streamlit GUI
+│  ├─ test_feature_mock.py
+│  └─ test_cnn_mock.py
+├─ main.py
 ├─ requirements.txt
+├─ .gitignore
 └─ README.md
 ```
 
-## 4. 环境安装
+## 5. 环境安装
 
-建议使用 Python 3.10+。
+建议 Python 3.10 及以上。
 
 ```bash
 pip install -r requirements.txt
 ```
 
-## 5. 命令行运行
+## 6. 运行方式
 
-### 5.1 生成两套划分
-
-```bash
-python -m scripts.split_rssi_dataset --test-size 0.2 --seed 42
-```
-
-### 5.2 分类任务（传统模型）
+### 6.1 命令行：生成划分
 
 ```bash
-python -c "from scripts.pipeline_runner import runClassificationDataPipeline; runClassificationDataPipeline(testSize=0.2, seed=42, windowSize=200, stepSize=100, pcaVariance=0.9019, usePca=True)"
-python -m scripts.train_and_validate_models --task classification
+python -m scripts.split_rssi_dataset --test-size 0.2 --seed 42 --unknown-ratio 0.4
 ```
 
-### 5.3 识别任务（传统模型，person-disjoint）
+### 6.2 命令行：仅数据流水线
 
 ```bash
-python -c "from scripts.pipeline_runner import runIdentificationDataPipeline; runIdentificationDataPipeline(testSize=0.2, seed=42, windowSize=200, stepSize=100, pcaVariance=0.9019, usePca=True)"
-python -m scripts.train_and_validate_models --task identification
+python -c "from scripts.pipeline_runner import run_classification_data_pipeline; print(run_classification_data_pipeline())"
+python -c "from scripts.pipeline_runner import run_identification_data_pipeline; print(run_identification_data_pipeline())"
 ```
 
-### 5.4 1D CNN 训练
+### 6.3 命令行：传统模型训练
 
 ```bash
-python -m scripts.train_cnn_models --task classification --epochs 20 --batch-size 64 --val-ratio 0.2 --early-stop-patience 5
-python -m scripts.train_cnn_models --task identification --epochs 20 --batch-size 64 --val-ratio 0.2 --early-stop-patience 5
+python -m scripts.train_and_validate_models --task classification --cv-folds 5 --seed 42
+python -m scripts.train_and_validate_models --task identification --threshold-quantile 0.95 --seed 42
 ```
 
-### 5.5 一键图形化运行
+### 6.4 命令行：CNN 训练
+
+```bash
+python -m scripts.train_cnn_models --task classification --epochs 20 --batch-size 64 --learning-rate 0.001 --val-ratio 0.2 --early-stop-patience 5 --seed 42
+python -m scripts.train_cnn_models --task identification --epochs 20 --batch-size 64 --learning-rate 0.001 --val-ratio 0.2 --early-stop-patience 5 --seed 42
+```
+
+### 6.5 图形化运行
 
 ```bash
 streamlit run main.py
 ```
 
-进入页面后可在训练页执行:
+页面支持：
 
-- 数据流水线（分类 + 识别）
-- 传统分类/识别训练
-- 1D CNN 分类/识别训练
+- 数据流水线执行（分类 + 识别）
+- 传统模型训练与评估
+- CNN 训练与推理
+- 单文件推理与可视化
 
-## 6. 说明
+## 7. Git 提交策略说明
 
-- 识别任务采用未见人员检测语义，指标中的 `positive_subject` 为 `unseen_person`。
-- 若出现模型与数据维度不匹配，请在训练页按当前参数重新执行对应任务的数据流水线并重训。
-- Pylance 若提示第三方库导入问题，请确认 VS Code 选中的 Python 解释器与安装依赖的环境一致。
+- 已提交：源码、README、raw 原始数据
+- 默认忽略：data、models、results、raw.zip 及常见模型缓存文件
+- 如需提交训练产物，请按需修改 .gitignore
+
+## 8. 常见问题
+
+- 若出现模型与数据维度不匹配，请先重新执行对应任务的数据流水线，再训练模型。
+- 若 VS Code 报第三方库导入错误（如 streamlit、seaborn、torch），通常是当前解释器环境未安装依赖，请重新执行 pip install -r requirements.txt 并切换到正确解释器。
