@@ -12,7 +12,6 @@ env/
 # Data and generated artifacts
 data/
 models/
-raw/
 results/
 raw.zip
 *.pkl
