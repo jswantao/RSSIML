@@ -10,14 +10,7 @@
   - 身份分类（多分类）
   - 身份识别（开放集，包含 Unknown 拒识）
 
-## 2. 当前进展
-
-- 已统一主流程调用接口（main.py 与 scripts 中的函数名一致）
-- 已完成项目 GitHub 上传
-- 已上传 raw 原始数据目录
-- 已通过 .gitignore 排除 data、models、results 等训练产物，避免仓库膨胀
-
-## 3. 处理与训练流水线
+## 2. 处理与训练流水线
 
 ```text
 raw/*.mat
@@ -29,7 +22,7 @@ raw/*.mat
   -> Web 可视化与推理 (main.py)
 ```
 
-### 3.1 数据划分
+### 2.1 数据划分
 
 - 分类任务：subject_stratified_file_split
   - 每个受试者在训练集和测试集都出现
@@ -40,7 +33,7 @@ raw/*.mat
   - unknown 人员全部进入测试集
   - 输出：data/rssi_split_identification.pkl
 
-### 3.2 滑窗构建
+### 2.2 滑窗构建
 
 - 默认窗口大小：200
 - 默认步长：100
@@ -48,7 +41,7 @@ raw/*.mat
   - data/rssi_windowed_classification.pkl
   - data/rssi_windowed_identification.pkl
 
-### 3.3 特征工程
+### 2.3 特征工程
 
 - 频域特征：窗口去均值后 FFT 低频幅值
 - 统计特征：标准差、偏度、峰度、过零率
@@ -58,7 +51,7 @@ raw/*.mat
   - data/rssi_processed_classification.pkl
   - data/rssi_processed_identification.pkl
 
-### 3.4 传统模型
+### 2.4 传统模型
 
 - 分类：SVM、RandomForest、XGBoost、LightGBM
 - 识别：基于类别中心与距离阈值的开放集识别
@@ -69,7 +62,7 @@ raw/*.mat
   - results/classification_metrics.json
   - results/identification_metrics.json
 
-### 3.5 1D CNN 模型
+### 2.5 1D CNN 模型
 
 - 结构：Conv1d + BN + ReLU + Pool + Dropout + FC
 - 训练：支持验证集、早停、随机种子控制
@@ -79,7 +72,7 @@ raw/*.mat
   - results/cnn_classification_metrics.json
   - results/cnn_identification_metrics.json
 
-## 4. 项目结构
+## 3. 项目结构
 
 ```text
 RSSIML/
@@ -106,7 +99,7 @@ RSSIML/
 └─ README.md
 ```
 
-## 5. 环境安装
+## 4. 环境安装
 
 建议 Python 3.10 及以上。
 
@@ -114,36 +107,36 @@ RSSIML/
 pip install -r requirements.txt
 ```
 
-## 6. 运行方式
+## 5. 运行方式
 
-### 6.1 命令行：生成划分
+### 5.1 命令行：生成划分
 
 ```bash
 python -m scripts.split_rssi_dataset --test-size 0.2 --seed 42 --unknown-ratio 0.4
 ```
 
-### 6.2 命令行：仅数据流水线
+### 5.2 命令行：仅数据流水线
 
 ```bash
 python -c "from scripts.pipeline_runner import run_classification_data_pipeline; print(run_classification_data_pipeline())"
 python -c "from scripts.pipeline_runner import run_identification_data_pipeline; print(run_identification_data_pipeline())"
 ```
 
-### 6.3 命令行：传统模型训练
+### 5.3 命令行：传统模型训练
 
 ```bash
 python -m scripts.train_and_validate_models --task classification --cv-folds 5 --seed 42
 python -m scripts.train_and_validate_models --task identification --threshold-quantile 0.95 --seed 42
 ```
 
-### 6.4 命令行：CNN 训练
+### 5.4 命令行：CNN 训练
 
 ```bash
 python -m scripts.train_cnn_models --task classification --epochs 20 --batch-size 64 --learning-rate 0.001 --val-ratio 0.2 --early-stop-patience 5 --seed 42
 python -m scripts.train_cnn_models --task identification --epochs 20 --batch-size 64 --learning-rate 0.001 --val-ratio 0.2 --early-stop-patience 5 --seed 42
 ```
 
-### 6.5 图形化运行
+### 5.5 图形化运行
 
 ```bash
 streamlit run main.py
@@ -156,13 +149,13 @@ streamlit run main.py
 - CNN 训练与推理
 - 单文件推理与可视化
 
-## 7. Git 提交策略说明
+## 6. Git 提交策略说明
 
 - 已提交：源码、README、raw 原始数据
 - 默认忽略：data、models、results、raw.zip 及常见模型缓存文件
 - 如需提交训练产物，请按需修改 .gitignore
 
-## 8. 常见问题
+## 7. 常见问题
 
 - 若出现模型与数据维度不匹配，请先重新执行对应任务的数据流水线，再训练模型。
 - 若 VS Code 报第三方库导入错误（如 streamlit、seaborn、torch），通常是当前解释器环境未安装依赖，请重新执行 pip install -r requirements.txt 并切换到正确解释器。
