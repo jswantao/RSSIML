@@ -39,7 +39,7 @@ class TestFeatureMock(unittest.TestCase):
         rng = np.random.default_rng(7)
         windows = rng.normal(size=(6, 200, 52)).astype(np.float32)
 
-        features = feature_module.extractFrequencyDomainFeatures(windows, lowFreqBins=12)
+        features = feature_module.extract_frequency_domain_features(windows, low_freq_bins=12)
 
         self.assertEqual(features.shape, (6, 12 * 52 + 4 * 52))
         self.assertTrue(np.all(np.isfinite(features)))
@@ -63,11 +63,11 @@ class TestFeatureMock(unittest.TestCase):
                 pickle.dump(payload, f)
 
             with patch.object(feature_module, "PCA", DummyPca):
-                result = feature_module.processFeatures(
-                    windowedFile=input_path,
-                    outputFile=output_path,
-                    usePca=True,
-                    lowFreqBins=12,
+                result = feature_module.process_features(
+                    windowed_file=input_path,
+                    output_file=output_path,
+                    use_pca=True,
+                    low_freq_bins=12,
                 )
 
         self.assertEqual(result["meta"]["feature_mode"], "fft_lowfreq_stats")
