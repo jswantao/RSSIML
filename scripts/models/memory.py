@@ -21,17 +21,39 @@ class MemoryMonitor:
         except ImportError:
             pass
 
+    # ── 属性 ────────────────────────────────────────────────────────
+
+    @property
+    def system_memory_pressure(self) -> float:
+        """系统内存使用率 (0.0 ~ 1.0)。"""
+        try:
+            import psutil
+            return psutil.virtual_memory().percent / 100.0
+        except ImportError:
+            return 0.0
+
+    @property
+    def gpu_memory_pressure(self) -> float:
+        """GPU 显存使用率 (0.0 ~ 1.0)。无 GPU 时返回 0。"""
+        if not self._gpu_available:
+            return 0.0
+        try:
+            import torch
+            allocated = torch.cuda.memory_allocated()
+            total = torch.cuda.get_device_properties(0).total_mem
+            return allocated / max(total, 1)
+        except Exception:
+            return 0.0
+
+    # ── 方法 ────────────────────────────────────────────────────────
+
     def spawn(self) -> MemoryMonitor:
         """返回自身 (兼容链式调用)。"""
         return self
 
     def should_degrade(self) -> bool:
         """检测是否应降级 (内存压力高)。"""
-        try:
-            import psutil
-            return psutil.virtual_memory().percent > 85
-        except ImportError:
-            return False
+        return self.system_memory_pressure > 0.85
 
     def get_optimal_batch_size(self, requested: int) -> int:
         """根据内存状态调整批次大小。"""
