@@ -147,7 +147,9 @@
       "Bash(awk '/^blob/ {print $2, $3}')",
       "Bash(git reset *)",
       "Bash(git add *)",
-      "Bash(git rm *)"
+      "Bash(git rm *)",
+      "Bash(git commit -m ' *)",
+      "Bash(git remote *)"
     ],
     "additionalDirectories": [
       "g:\\Desktop\\WiFiML\\cache",
