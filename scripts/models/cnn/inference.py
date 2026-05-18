@@ -4,7 +4,12 @@ import gc
 import logging
 from pathlib import Path
 import numpy as np
-import torch
+try:
+    import torch
+    _TORCH_AVAILABLE = True
+except ImportError:
+    _TORCH_AVAILABLE = False
+
 from sklearn.preprocessing import LabelEncoder
 
 from scripts.models.cnn.models import (

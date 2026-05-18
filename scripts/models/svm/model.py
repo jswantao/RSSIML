@@ -3,7 +3,7 @@
 import numpy as np
 from sklearn.preprocessing import LabelEncoder
 
-from scripts.models import MODEL_VERSION
+from scripts.models import MODEL_VERSION  # 延迟: __init__.py 先定义 MODEL_VERSION
 
 
 class AuthenticationModel:

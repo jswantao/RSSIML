@@ -101,3 +101,68 @@ class CNNAuthenticationModel:
     scaler_model: Any = None
     feature_config: dict[str, Any] | None = None
     feature_dim: int | None = None
+
+
+# ══════════════════════════════════════════════════════════════════════
+# 共享工具 (供 inference.py 使用)
+# ══════════════════════════════════════════════════════════════════════
+
+def _get_activation(name: str = "relu"):
+    """根据名称返回激活函数。"""
+    if not _TORCH_AVAILABLE:
+        raise ImportError("PyTorch 不可用")
+    activations = {
+        "relu": nn.ReLU(inplace=True),
+        "gelu": nn.GELU(),
+        "leaky_relu": nn.LeakyReLU(0.1, inplace=True),
+    }
+    return activations.get(name, nn.ReLU(inplace=True))
+
+
+def prepare_cnn_input(x, device=None):
+    """将 numpy 数组转为 CNN 输入张量。"""
+    if not _TORCH_AVAILABLE:
+        raise ImportError("PyTorch 不可用")
+    import torch
+    if isinstance(x, np.ndarray):
+        t = torch.from_numpy(x.astype(np.float32))
+    else:
+        t = x
+    if device is not None:
+        t = t.to(device)
+    return t
+
+
+class _ConvBackbone(nn.Sequential if _TORCH_AVAILABLE else object):
+    """卷积骨干网络 — 供 CNN 模型内部使用。"""
+
+    def __init__(self, in_channels: int, config: CNNConfig | None = None):
+        if not _TORCH_AVAILABLE:
+            raise ImportError("PyTorch 不可用")
+        cfg = config or CNNConfig()
+        layers = []
+        ch_in = in_channels
+
+        # 可选: 瓶颈层降维
+        bottleneck_out = min(64, in_channels)
+        if in_channels > 64:
+            layers.extend([
+                nn.Conv1d(in_channels, bottleneck_out, 1),
+                nn.BatchNorm1d(bottleneck_out),
+                _get_activation(cfg.activation if hasattr(cfg, 'activation') else "relu"),
+            ])
+            ch_in = bottleneck_out
+
+        ks = cfg.kernel_size
+        pad = ks // 2
+        for out_ch in cfg.conv_channels:
+            layers.extend([
+                nn.Conv1d(ch_in, out_ch, ks, padding=pad),
+                nn.BatchNorm1d(out_ch),
+                _get_activation(cfg.activation if hasattr(cfg, 'activation') else "relu"),
+                nn.MaxPool1d(2),
+            ])
+            ch_in = out_ch
+
+        super().__init__(*layers)
+        self.bottleneck = nn.Sequential(*layers[:3]) if in_channels > 64 else nn.Identity()

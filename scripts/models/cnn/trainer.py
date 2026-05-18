@@ -17,8 +17,9 @@ from typing import Any, Callable
 import numpy as np
 
 from scripts.config import PipelineConfig
-from scripts.models.cnn.models import CNNConfig, RSSICNNBinaryClassifier, CNNAuthenticationModel
-from scripts.models.metrics import evaluate_authentication
+from scripts.models.cnn.models import RSSICNNBinaryClassifier, CNNAuthenticationModel
+from scripts.models.config import CNNConfig
+from scripts.models.base import evaluate_authentication
 
 logger = logging.getLogger(__name__)
 
