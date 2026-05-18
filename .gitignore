@@ -19,7 +19,12 @@ raw.zip
 *.pt
 *.mat
 *.log
+WiFi/
 
 # IDE files
 .vscode/
 .idea/
+# Cache (large binary artifacts)
+cache/
+# Raw RSSI data
+raw/

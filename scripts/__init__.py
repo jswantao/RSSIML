@@ -1,9 +1,10 @@
 # -*- coding: utf-8 -*-
-"""RSSI 机器学习流水线脚本包。
+"""WiFiML — 基于 Wi-Fi 信号的身份认证流水线。
 
-该包提供了构建、运行和评估 RSSI 身份识别与分类模型的完整工具链，
-包括数据加载、预处理、特征工程、模型训练和验证等核心模块。
+提供从原始数据加载到模型训练和在线推理的完整工具链，
+支持 SVM 和 1D-CNN 两条建模路线，RSSI (MAT) 和 CSI (NPY) 双数据源。
 """
+import logging
 
 # --- 导入模块 ---
 
@@ -11,74 +12,75 @@
 from scripts.config import PipelineConfig
 
 # 数据加载模块
-from scripts.data_loader import DataFormatError, load_rssi_data
+from scripts.data_loader import (
+    DataFormatError,
+    DataLoadContext,
+    estimate_matrix_memory,
+    load_csi_data,
+    load_csi_data_generator,
+    load_npy_matrix,
+    load_rssi_data,
+    load_rssi_data_generator,
+    parse_npy_filename,
+    validate_matrix,
+)
 
 # 滑动窗口模块
 from scripts.build_sliding_windows import (
     WindowBuilder,
     WindowConfig,
     WindowProcessor,
-    build_sliding_windows,
-    make_windows,
 )
 
 # 特征处理模块
 from scripts.process_features_pca_norm import (
-    FeatureConfig,
     FeatureExtractor,
     FeatureProcessor,
-    extract_frequency_domain_features,
-    process_features,
+    PreprocessConfig,
 )
 
 # 数据集划分模块
 from scripts.split_rssi_dataset import (
     DatasetSplitter,
+    DatasetSummary,
     Sample,
-    split_classification_dataset,
-    split_identification_dataset,
+    split_authentication_dataset,
 )
 
-# 传统模型训练模块
-from scripts.train_and_validate_models import (
-    ClassificationMetrics,
-    ClassificationTrainer,
-    DataLoader,
-    IdentificationModel,
-    IdentificationTrainer,
-    MetricsCalculator,
-    ModelFactory,
-    TrainingConfig,
-    TrainingPipeline as TraditionalTrainingPipeline,  # 避免与 pipeline_runner 中的 TrainingPipeline 混淆
-    train_classification,
-    train_identification,
-)
-
-# CNN 模型训练模块
-from scripts.train_cnn_models import (
-    CNNCheckpoint,
+# 统一模型训练模块
+from scripts.models import (
+    # Configs
     CNNConfig,
+    CNNTrainConfig,
+    SVMConfig,
+    # Models
+    AuthenticationModel,
+    CNNAuthenticationModel,
+    RSSICNNBinaryClassifier,
+    # Trainers
     CNNInference,
     CNNTrainer,
-    RSSICNNClassifier,
-    TrainingConfig as CNNTrainingConfig,  # 避免与上述 TrainingConfig 混淆
+    SVMAuthenticationTrainer,
+    TrainingError,
+    # Functions
+    MetricsCalculator,
+    compute_threshold,
+    evaluate_authentication,
+    svm_scores,
     load_cnn_checkpoint,
-    predict_cnn_embeddings,
-    predict_cnn_probabilities,
-    predict_cnn_windows,
-    train_cnn_classification,
-    train_cnn_identification,
+    train_cnn_authentication,
 )
 
 # 流水线运行模块
 from scripts.pipeline_runner import (
+    AuthPipeline,
     DataPipeline,
     PipelineParams,
     PipelineResult,
-    TrainingPipeline,
-    create_pipeline,
-    run_classification_pipeline,
-    run_identification_pipeline,
+    run_authentication_pipeline,
+    run_data_pipeline,
+    run_npy_authentication_cnn,
+    run_npy_authentication_svm,
 )
 
 # --- 定义公共 API ---
@@ -86,57 +88,61 @@ __all__ = [
     # 配置
     "PipelineConfig",
     "WindowConfig",
-    "FeatureConfig",
-    "TrainingConfig",  # 传统模型的配置
+    "PreprocessConfig",
+    "SVMConfig",
     "CNNConfig",
-    "CNNTrainingConfig",  # CNN 模型的配置
+    "CNNTrainConfig",
     "PipelineParams",
     "PipelineResult",
     # 异常
     "DataFormatError",
-    # 数据加载与样本
+    "DataLoadContext",
+    "TrainingError",
+    # 数据加载
+    "estimate_matrix_memory",
     "load_rssi_data",
+    "load_rssi_data_generator",
+    "load_csi_data",
+    "load_csi_data_generator",
+    "load_npy_matrix",
+    "parse_npy_filename",
+    "validate_matrix",
     "Sample",
+    # 数据摘要
+    "DatasetSummary",
     # 数据划分
     "DatasetSplitter",
-    "split_classification_dataset",
-    "split_identification_dataset",
+    "split_authentication_dataset",
     # 滑动窗口
     "WindowBuilder",
     "WindowProcessor",
-    "build_sliding_windows",
-    "make_windows",
     # 特征处理
     "FeatureExtractor",
     "FeatureProcessor",
-    "extract_frequency_domain_features",
-    "process_features",
     # 流水线
     "DataPipeline",
-    "TrainingPipeline",  # pipeline_runner 中的高级流水线
-    "TraditionalTrainingPipeline",  # train_and_validate_models 中的基础流水线
-    "create_pipeline",
-    "run_classification_pipeline",
-    "run_identification_pipeline",
-    # 传统模型
-    "ClassificationMetrics",
-    "ClassificationTrainer",
-    "IdentificationModel",
-    "IdentificationTrainer",
-    "MetricsCalculator",
-    "ModelFactory",
-    "DataLoader",
-    "train_classification",
-    "train_identification",
+    "AuthPipeline",
+    "run_authentication_pipeline",
+    "run_data_pipeline",
+    "run_npy_authentication_svm",
+    "run_npy_authentication_cnn",
+    # SVM 模型
+    "AuthenticationModel",
+    "SVMAuthenticationTrainer",
+    "svm_scores",
     # CNN 模型
-    "RSSICNNClassifier",
+    "RSSICNNBinaryClassifier",
+    "CNNAuthenticationModel",
     "CNNTrainer",
     "CNNInference",
-    "CNNCheckpoint",
     "load_cnn_checkpoint",
-    "predict_cnn_windows",
-    "predict_cnn_probabilities",
-    "predict_cnn_embeddings",
-    "train_cnn_classification",
-    "train_cnn_identification",
+    "train_cnn_authentication",
+    # 共享函数
+    "MetricsCalculator",
+    "compute_threshold",
+    "evaluate_authentication",
 ]
+
+# 包级日志配置
+logger = logging.getLogger(__name__)
+logger.addHandler(logging.NullHandler())
