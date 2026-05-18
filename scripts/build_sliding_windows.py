@@ -87,6 +87,14 @@ class WindowBuilder:
         self.window_config = window_config or WindowConfig()
 
     # ── 核心构建 ───────────────────────────────────────────────────────
+
+    @staticmethod
+    def estimate_num_windows(time_steps: int, window_size: int = 200, step_size: int = 100) -> int:
+        """估算给定时间步数的窗口数量 (静态方法, 无需实例化)。"""
+        if time_steps < window_size:
+            return 0
+        return (time_steps - window_size) // step_size + 1
+
     def build(
         self,
         data: np.ndarray,
