@@ -1,5 +1,9 @@
 # -*- coding: utf-8 -*-
-"""CNN 训练器与推理引擎。"""
+"""CNN 训练器与推理引擎。
+
+训练: 逐用户训练二分类 CNN → 保存模型权重检查点。
+推理: 加载检查点 → 对指定用户执行 sigmoid 概率预测。
+"""
 from __future__ import annotations
 
 import gc
@@ -14,7 +18,7 @@ import numpy as np
 
 from scripts.config import PipelineConfig
 from scripts.models.cnn.models import CNNConfig, RSSICNNBinaryClassifier, CNNAuthenticationModel
-from scripts.models.metrics import evaluate_authentication, MetricsCalculator
+from scripts.models.metrics import evaluate_authentication
 
 logger = logging.getLogger(__name__)
 
@@ -41,7 +45,14 @@ class CNNTrainConfig:
 
 
 class CNNTrainer:
-    """CNN 认证训练器。"""
+    """CNN 认证训练器 — 逐用户 1D-CNN 二分类。
+
+    训练流程:
+      1. 加载窗口数据 (N, C, W)
+      2. 对每个用户: genuine=1, impostor=0 → BCEWithLogitsLoss
+      3. 训练完成后保存模型权重到检查点
+      4. 使用 evaluate_authentication 评估 (兼容 nn.Module)
+    """
 
     def __init__(
         self,
@@ -60,7 +71,16 @@ class CNNTrainer:
         data_file: Path,
         model_path: Path | None = None,
     ) -> dict[str, Any]:
-        """训练 CNN 认证模型。"""
+        """训练 CNN 认证模型。
+
+        Args:
+            data_file: pickle 文件 (含 x_train, y_train, x_test, y_test)。
+                       x_train shape = (N, C, W) 三维窗口数据。
+            model_path: 检查点保存路径 (.pt)。
+
+        Returns:
+            训练结果 dict。
+        """
         if not _TORCH_AVAILABLE:
             raise ImportError("PyTorch 不可用")
 
@@ -77,12 +97,25 @@ class CNNTrainer:
         tc = self.train_config
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-        logger.info("CNN 训练: %d 用户, device=%s, epochs=%d, batch=%d",
-                     len(subjects), device, tc.epochs, tc.batch_size)
+        # 输入维度: (N, C, W) → C = n_channels
+        if x_train.ndim == 3:
+            n_channels = x_train.shape[1]
+        elif x_train.ndim == 2:
+            n_channels = x_train.shape[1]
+        else:
+            raise ValueError(f"x_train 维度异常: {x_train.shape}")
+
+        logger.info(
+            "CNN 训练: %d 用户, device=%s, epochs=%d, batch=%d, channels=%d",
+            len(subjects), device, tc.epochs, tc.batch_size, n_channels,
+        )
+
+        # 将全量数据一次性移到设备上 (避免逐用户重复传输)
+        x_tensor = torch.from_numpy(x_train).to(device)
 
         verifiers: dict[str, Any] = {}
         thresholds: dict[str, float] = {}
-        all_models: dict[str, Path] = {}
+        state_dicts: dict[str, dict] = {}
         t0 = time.time()
 
         for subj in subjects:
@@ -90,16 +123,11 @@ class CNNTrainer:
 
             genuine_mask = y_train == subj
             binary_labels = np.where(genuine_mask, 1, 0).astype(np.float32)
-
-            # 准备数据
-            x_tensor = torch.from_numpy(x_train).to(device)
             y_tensor = torch.from_numpy(binary_labels).unsqueeze(1).to(device)
 
             dataset = TensorDataset(x_tensor, y_tensor)
             loader = DataLoader(dataset, batch_size=tc.batch_size, shuffle=True)
 
-            # 创建模型
-            n_channels = x_train.shape[1] if x_train.ndim == 3 else x_train.shape[-1]
             model = RSSICNNBinaryClassifier(
                 input_channels=n_channels,
                 num_classes=1,
@@ -110,9 +138,12 @@ class CNNTrainer:
                 model.parameters(), lr=tc.learning_rate, weight_decay=tc.weight_decay,
             )
             criterion = nn.BCEWithLogitsLoss()
-            scaler = torch.amp.GradScaler("cuda") if tc.use_amp and device.type == "cuda" else None
+            scaler = (
+                torch.amp.GradScaler("cuda")
+                if tc.use_amp and device.type == "cuda"
+                else None
+            )
 
-            # 训练循环
             model.train()
             for epoch in range(tc.epochs):
                 self.cancel_fn()
@@ -120,7 +151,7 @@ class CNNTrainer:
                 n_batches = 0
 
                 for batch_idx, (xb, yb) in enumerate(loader):
-                    if tc.use_amp and scaler is not None:
+                    if scaler is not None:
                         with torch.amp.autocast("cuda"):
                             logits = model(xb)
                             loss = criterion(logits, yb) / tc.gradient_accumulation_steps
@@ -141,21 +172,26 @@ class CNNTrainer:
                     n_batches += 1
 
                 if epoch % 5 == 0 or epoch == tc.epochs - 1:
-                    logger.info("  用户 %s epoch %d/%d loss=%.4f",
-                                subj, epoch + 1, tc.epochs, epoch_loss / max(1, n_batches))
+                    logger.info(
+                        "  用户 %s epoch %d/%d loss=%.4f",
+                        subj, epoch + 1, tc.epochs,
+                        epoch_loss / max(1, n_batches),
+                    )
 
-            verifiers[subj] = model
-            # 计算阈值
             model.eval()
+            verifiers[subj] = model
+            state_dicts[subj] = model.state_dict()
+
+            # 计算阈值: 对训练数据执行推理取 genuine 概率中位数
             with torch.no_grad():
-                all_logits = model(x_tensor).cpu().numpy().squeeze()
-                all_probs = 1 / (1 + np.exp(-all_logits))  # sigmoid
+                all_logits = model(x_tensor).cpu().numpy().squeeze(-1)
+                all_probs = 1.0 / (1.0 + np.exp(-all_logits))
             thresholds[subj] = float(np.median(all_probs[genuine_mask]))
 
         train_dur = time.time() - t0
         logger.info("CNN 训练完成: %d 用户, 耗时 %.1fs", len(verifiers), train_dur)
 
-        # 保存检查点
+        # 保存检查点 (包含模型权重)
         checkpoint_path = ""
         if model_path:
             model_path.parent.mkdir(parents=True, exist_ok=True)
@@ -163,16 +199,20 @@ class CNNTrainer:
                 "subjects": subjects,
                 "thresholds": thresholds,
                 "model_cfg": self.model_cfg,
+                "input_channels": n_channels,
+                "state_dicts": state_dicts,
             }, model_path)
             checkpoint_path = str(model_path)
+            logger.info("CNN 检查点已保存: %s", model_path)
 
-        # 评估
+        # 构建认证模型
         from scripts.models.svm import AuthenticationModel
         auth_model = AuthenticationModel(
             verifiers=verifiers,
             thresholds=thresholds,
         )
 
+        # 评估 (evaluate_authentication 已兼容 nn.Module verifier)
         system_metrics = evaluate_authentication(
             auth_model, x_test, y_test,
             threshold_method=tc.threshold_method,
@@ -190,55 +230,93 @@ class CNNTrainer:
 
 
 class CNNInference:
-    """CNN 推理引擎 — 从检查点加载模型并执行推理。"""
+    """CNN 推理引擎 — 从检查点加载模型并执行推理。
+
+    属性:
+        is_authentication: 检查点是否为认证模型 (含 subjects + thresholds)。
+        subjects: 注册用户列表。
+        thresholds: 用户阈值字典。
+    """
 
     def __init__(self, model_path: Path | str):
         if not _TORCH_AVAILABLE:
             raise ImportError("PyTorch 不可用")
         self.model_path = Path(model_path)
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        self._checkpoint = None
+        self._checkpoint: dict | None = None
         self._models: dict[str, RSSICNNBinaryClassifier] = {}
+        self._loaded = False
 
     def load(self) -> None:
-        """加载检查点。"""
-        self._checkpoint = torch.load(self.model_path, map_location=self.device, weights_only=False)
+        """加载检查点并重建模型。"""
+        self._checkpoint = torch.load(
+            self.model_path, map_location=self.device, weights_only=False,
+        )
         logger.info("CNN 检查点已加载: %s", self.model_path)
+
+        # 重建模型
+        state_dicts = self._checkpoint.get("state_dicts", {})
+        model_cfg = self._checkpoint.get("model_cfg", CNNConfig())
+        n_channels = self._checkpoint.get("input_channels", 0)
+
+        for subj, sd in state_dicts.items():
+            model = RSSICNNBinaryClassifier(
+                input_channels=n_channels,
+                num_classes=1,
+                config=model_cfg,
+            ).to(self.device)
+            model.load_state_dict(sd)
+            model.eval()
+            self._models[subj] = model
+
+        self._loaded = True
+        logger.info("重建 %d 个用户 CNN 模型", len(self._models))
+
+    def _ensure_loaded(self) -> None:
+        if not self._loaded:
+            self.load()
 
     def predict(self, features: np.ndarray, subject: str) -> np.ndarray:
         """对指定用户执行推理。
 
         Args:
-            features: (N, C, W) 或 (N, D) 特征。
+            features: (N, C, W) 窗口数据。
             subject: 待验证的用户 ID。
 
         Returns:
-            (N,) 概率分数。
+            (N,) sigmoid 概率分数。
         """
-        if self._checkpoint is None:
-            self.load()
+        self._ensure_loaded()
 
         if subject not in self._models:
             logger.warning("用户 %s 不在检查点中", subject)
             return np.zeros(features.shape[0])
 
         model = self._models[subject]
-        model.eval()
-
-        x_tensor = torch.from_numpy(features.astype(np.float32)).to(self.device)
+        x_tensor = torch.from_numpy(np.asarray(features, dtype=np.float32)).to(self.device)
         with torch.no_grad():
-            logits = model(x_tensor).cpu().numpy().squeeze()
+            logits = model(x_tensor).cpu().numpy().squeeze(-1)
 
-        return 1 / (1 + np.exp(-logits))  # sigmoid
+        return 1.0 / (1.0 + np.exp(-logits.astype(np.float64)))
+
+    @property
+    def is_authentication(self) -> bool:
+        """是否为认证模型检查点。"""
+        self._ensure_loaded()
+        return bool(self._checkpoint.get("subjects"))
 
     @property
     def subjects(self) -> list[str]:
-        if self._checkpoint is None:
-            self.load()
+        self._ensure_loaded()
         return self._checkpoint.get("subjects", [])
 
     @property
     def thresholds(self) -> dict[str, float]:
-        if self._checkpoint is None:
-            self.load()
+        self._ensure_loaded()
         return self._checkpoint.get("thresholds", {})
+
+    @property
+    def verifiers(self) -> dict[str, RSSICNNBinaryClassifier]:
+        """返回重建的模型字典 (兼容 AuthenticationModel 接口)。"""
+        self._ensure_loaded()
+        return self._models
