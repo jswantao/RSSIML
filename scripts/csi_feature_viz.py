@@ -21,7 +21,7 @@ _FS = 100.0
 _CUTOFF = 20.0
 _ORDER = 4
 _OUT_DIR = Path("results/figures")
-_FONT = {"small": 9, "normal": 11, "large": 13, "title": 15}
+from scripts.app_utils import FONT_SIZES as _FONT
 _CSI_DISK_OFFSET = 11
 _CSI_DIR = Path("WiFi")
 

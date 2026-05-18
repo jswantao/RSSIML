@@ -89,7 +89,7 @@ def clean_title(ax: plt.Axes) -> str:
 def save_experiment_figure(
     fig: plt.Figure, 
     exp_name: str, 
-    output_dir: Path | str
+    output_dir: Path | str = "results/figures"
 ) -> Path:
     """保存整张实验图到指定目录, 文件名包含实验名和时间戳。"""
     out_dir = Path(output_dir)
@@ -102,7 +102,7 @@ def save_experiment_figure(
 def save_experiment_subfigures(
     fig: plt.Figure, 
     exp_name: str, 
-    output_dir: Path | str
+    output_dir: Path | str = "results/figures"
 ) -> list[Path]:
     """将组合图中的每个子图分别保存为独立文件。
     遍历 Figure 的所有 Axes, 逐个隐藏其余子图后以 tight bbox 保存。
@@ -122,9 +122,10 @@ def save_experiment_subfigures(
         
         # 隐藏 Figure 级大标题
         stitle = getattr(fig, "_suptitle", None)
+        suptitle_was_visible = False
         if stitle and stitle.get_visible():
+            suptitle_was_visible = True
             stitle.set_visible(False)
-            restores[-1] = stitle
             
         title = clean_title(ax)
         label = title if title else f"subplot_{i+1:02d}"
@@ -136,10 +137,9 @@ def save_experiment_subfigures(
         
         # 恢复可见性状态
         for j, visible in restores.items():
-            if j == -1:
-                visible.set_visible(True)
-            else:
-                fig.axes[j].set_visible(visible)
+            fig.axes[j].set_visible(visible)
+        if suptitle_was_visible and stitle:
+            stitle.set_visible(True)
                 
     return paths
 
@@ -240,8 +240,9 @@ def extract_features_for_auth(
         low_freq_bins=lfb, denoise=dn, denoise_kernel=dk,
     )
     
-    # 复用缓存的 FeatureExtractor 实例
-    fe = get_auth_feature_extractor(cfg)
+    # 创建独立的 FeatureExtractor 实例避免线程安全问题
+    # (pca/scaler 是可变状态, 不能修改共享缓存实例)
+    fe = FeatureExtractor(cfg)
     fe.pca = pca
     fe.scaler = scaler
     

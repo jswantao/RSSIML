@@ -265,6 +265,18 @@ class PipelineConfig:
         logger.info("日志已配置: level=%s, file=%s", logging.getLevelName(level), log_file)
         return proj_logger
 
+
+    def subject_map(self, source: str) -> dict[str, str]:
+        """获取用户 ID 映射 (原始 → 标准化)。"""
+        if source == "csi":
+            return self.SUBJECT_MAP_CSI
+        return self.SUBJECT_MAP_RSSI
+
+    def subject_unmap(self, source: str) -> dict[str, str]:
+        """获取用户 ID 反向映射 (标准化 → 原始)。"""
+        fwd = self.subject_map(source)
+        return {v: k for k, v in fwd.items()}
+
     def __repr__(self) -> str:
         return (
             f"PipelineConfig(root={self.root_dir.name}, seed={self.random_seed}, "

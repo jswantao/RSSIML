@@ -545,3 +545,12 @@ def split_authentication_dataset(
         cross_activity=cross_activity,
         compress=compress,
     )
+
+# ══════════════════════════════════════════════════════════════════════
+# 缓存清理
+# ══════════════════════════════════════════════════════════════════════
+def _clear_sample_cache(context: DataLoadContext | None = None) -> None:
+    """清除样本缓存 — 释放 DataLoadContext 持有的数据。"""
+    if context is not None:
+        context.clear()
+    logger.debug("样本缓存已清理")

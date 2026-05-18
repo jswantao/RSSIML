@@ -30,7 +30,7 @@ import time
 from collections import OrderedDict
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Callable, Literal, Optional, Any
+from typing import Callable, Literal, Any
 
 import numpy as np
 
@@ -238,7 +238,7 @@ class PipelineCache:
         cache_path = Path(self._cache_index[key]["path"])
         return cache_path.exists()
     
-    def load(self, stage: str, params_hash: str) -> Optional[Any]:
+    def load(self, stage: str, params_hash: str) -> Any | None:
         """加载缓存的中间结果。"""
         key = f"{stage}_{params_hash}"
         if not self.exists(stage, params_hash):

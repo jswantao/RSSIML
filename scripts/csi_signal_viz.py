@@ -21,7 +21,7 @@ _ORDER = 4          # 滤波器阶数
 _WIN_S = 3.0        # 滑动窗口时长 (s)
 _OVERLAP = 0.5      # 窗口重叠比例
 _OUT_DIR = Path("results/figures")
-_FONT = {"small": 9, "normal": 11, "large": 13, "title": 15}
+from scripts.app_utils import FONT_SIZES as _FONT
 
 # CSI 用户映射: UI 编号 → 磁盘编号 (1→12, ..., 19→30)
 _CSI_DISK_OFFSET = 11
