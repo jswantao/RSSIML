@@ -17,13 +17,14 @@ import numpy as np
 from scipy.signal import butter, sosfiltfilt, welch, correlate
 from scipy.stats import skew, kurtosis
 
-_FS = 100.0
-_CUTOFF = 20.0
-_ORDER = 4
-_OUT_DIR = Path("results/figures")
+_FS = Defaults.CSI_SAMPLE_RATE
+_CUTOFF = Defaults.CSI_BUTTERWORTH_CUTOFF_HZ
+_ORDER = Defaults.CSI_BUTTERWORTH_ORDER
+_OUT_DIR = Path(Defaults.FIGURE_OUTPUT_DIR)
+from scripts.config import Defaults, PipelineConfig
 from scripts.app_utils import FONT_SIZES as _FONT
-_CSI_DISK_OFFSET = 11
-_CSI_DIR = Path("WiFi")
+_CSI_DISK_OFFSET = Defaults.CSI_DISK_OFFSET
+_CSI_DIR = PipelineConfig.from_root().npy_dir
 
 
 def _setup_style():

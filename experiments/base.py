@@ -14,7 +14,7 @@ from scripts.app_utils import (
     extract_features_for_auth,
     find_processed_file,
 )
-from scripts.config import PipelineConfig
+from scripts.config import Defaults, PipelineConfig
 from scripts.models import clear_gpu_memory, svm_scores
 from scripts.pipeline_runner import AuthPipeline
 
@@ -38,8 +38,8 @@ class BaseExperimentRunner:
 
     def _pipeline(self, **kw):
         defaults = dict(
-            data_source=self.source, seed=42, test_size=0.2,
-            window_size=200, step_size=100, use_pca=False,
+            data_source=self.source, seed=Defaults.SEED, test_size=Defaults.TEST_SIZE,
+            window_size=Defaults.WINDOW_SIZE, step_size=Defaults.STEP_SIZE, use_pca=False,
             use_cache=True, use_model_cache=False,
             cache_path=None,
             save_model=False, save_metrics=False, clean_intermediate=False,
@@ -88,7 +88,7 @@ class BaseExperimentRunner:
             cancel_fn=self._check_cancelled,
         )
 
-    def _compute_continuous_auth(self, result, smooth_window=10):
+    def _compute_continuous_auth(self, result, smooth_window=Defaults.CONTINUOUS_AUTH_SMOOTH_WINDOW):
         """持续认证评估 
 
         

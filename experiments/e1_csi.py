@@ -1,3 +1,4 @@
+from scripts.config import Defaults
 # -*- coding: utf-8 -*-
 """E1: CSI 单次认证实验 — 文件级随机划分, 同身份 vs 跨身份冒名攻击对比。"""
 import numpy as np
@@ -14,13 +15,13 @@ def run_e1(self):
     self.logger.info("E1: CSI 单次认证 (文件级划分, 10动作, 在线SVM-linear, Butterworth降噪)")
     r = self._run_svm(
         cross_activity=False,
-        seed=42,
-        test_size=0.2,
-        window_size=200,
-        step_size=100,
+        seed=Defaults.SEED,
+        test_size=Defaults.TEST_SIZE,
+        window_size=Defaults.WINDOW_SIZE,
+        step_size=Defaults.STEP_SIZE,
         max_files_per_subject=100,
-        threshold_method="youden",
-        cv_folds=5,
+        threshold_method=Defaults.THRESHOLD_METHOD,
+        cv_folds=Defaults.CV_FOLDS,
         use_online_svm=True,
         online_kernel="linear",
         csi_denoise="butterworth",

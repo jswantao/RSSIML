@@ -283,3 +283,54 @@ class PipelineConfig:
             f"test_size={self.test_size}, window={self.window_size}/{self.step_size}, "
             f"pca={'on' if self.use_pca else 'off'})"
         )
+
+# ══════════════════════════════════════════════════════════════════════
+# 项目级默认常量 — 所有模块应从此处引用，避免硬编码分散
+# ══════════════════════════════════════════════════════════════════════
+
+class Defaults:
+    """项目默认参数集中管理。
+
+    实验脚本、流水线便捷函数、可视化工具应引用此处的常量，
+    而非各自硬编码。修改默认值只需改动此处。
+    """
+
+    # ── 流水线核心参数 ────────────────────────────────────────────────
+    SEED: int = 42
+    TEST_SIZE: float = 0.2
+    WINDOW_SIZE: int = 200
+    STEP_SIZE: int = 100
+    PCA_VARIANCE: float = 0.9019
+
+    # ── SVM ───────────────────────────────────────────────────────────
+    THRESHOLD_METHOD: str = "youden"
+    CV_FOLDS: int = 5
+    MAX_FILES_PER_SUBJECT_CSI: int = 220
+    MAX_FILES_PER_SUBJECT_RSSI: int = 4
+
+    # ── CNN ───────────────────────────────────────────────────────────
+    CNN_EPOCHS: int = 20
+    CNN_BATCH_SIZE: int = 64
+    CNN_LEARNING_RATE: float = 0.001
+
+    # ── 持续认证 ──────────────────────────────────────────────────────
+    CONTINUOUS_AUTH_SMOOTH_WINDOW: int = 10
+
+    # ── 切片认证 ──────────────────────────────────────────────────────
+    SLICE_DURATION_S: float = 5.0
+    RSSI_SAMPLE_RATE: float = 100.0
+
+    # ── CSI 信号处理 ──────────────────────────────────────────────────
+    CSI_SAMPLE_RATE: float = 100.0
+    CSI_DISK_OFFSET: int = 11          # UI 用户编号 → 磁盘编号偏移 (1→12)
+    CSI_BUTTERWORTH_CUTOFF_HZ: float = 20.0
+    CSI_BUTTERWORTH_ORDER: int = 4
+
+    # ── 可视化 ────────────────────────────────────────────────────────
+    FONT_SIZES: dict = {
+        "small": 14,
+        "normal": 15,
+        "large": 16,
+        "title": 18,
+    }
+    FIGURE_OUTPUT_DIR: str = "results/figures"

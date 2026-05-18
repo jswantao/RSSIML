@@ -1,3 +1,4 @@
+from scripts.config import Defaults
 # -*- coding: utf-8 -*-
 """E2: RSSI 持续认证实验 — 完整复现基础训练→推理阶段的全流程。"""
 import numpy as np
@@ -22,8 +23,8 @@ def run_e2(self):
     # ── 阶段1: 模型训练 (与基础训练标签页完全一致) ─────────────────
     self.logger.info("训练 SVM 模型 (匹配基础训练 RSSI 默认配置)...")
     r = self._run_svm(
-        seed=42, test_size=0.2, window_size=200, step_size=100,
-        threshold_method="youden", cv_folds=5,
+        seed=Defaults.SEED, test_size=Defaults.TEST_SIZE, window_size=Defaults.WINDOW_SIZE, step_size=Defaults.STEP_SIZE,
+        threshold_method=Defaults.THRESHOLD_METHOD, cv_folds=Defaults.CV_FOLDS,
         use_pca=False, use_online_svm=False,
         feature_groups=("spectral", "statistical", "temporal"),
         cross_activity=False, clean_intermediate=True,

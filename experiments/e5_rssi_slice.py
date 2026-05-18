@@ -1,3 +1,4 @@
+from scripts.config import Defaults
 # -*- coding: utf-8 -*-
 """E5: RSSI 切片式单次认证实验 — 每切片独立认证, 汇总评估整体性能。"""
 import numpy as np
@@ -26,8 +27,8 @@ def run_e5(self):
     # ── 阶段1: 模型训练 (与推理一致) ─────────────────────────────────
     self.logger.info("训练 SVM 模型 (匹配基础训练 RSSI 默认配置)...")
     r = self._run_svm(
-        seed=42, test_size=0.2, window_size=200, step_size=100,
-        threshold_method="youden", cv_folds=5,
+        seed=Defaults.SEED, test_size=Defaults.TEST_SIZE, window_size=Defaults.WINDOW_SIZE, step_size=Defaults.STEP_SIZE,
+        threshold_method=Defaults.THRESHOLD_METHOD, cv_folds=Defaults.CV_FOLDS,
         use_pca=False, use_online_svm=False,
         feature_groups=("spectral", "statistical", "temporal"),
         cross_activity=False, clean_intermediate=True,

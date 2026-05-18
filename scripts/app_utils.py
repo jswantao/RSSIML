@@ -21,18 +21,13 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 from scripts.build_sliding_windows import WindowBuilder, WindowConfig
-from scripts.config import PipelineConfig
+from scripts.config import Defaults, PipelineConfig
 from scripts.process_features_pca_norm import FeatureExtractor, PreprocessConfig
 
 # ══════════════════════════════════════════════════════════════════════
 # 全局不可变配置 (线程安全)
 # ══════════════════════════════════════════════════════════════════════
-FONT_SIZES: dict[str, int] = {
-    "small": 14,       # annotations, bar labels, deemphasized text
-    "normal": 15,      # tick labels, legend text
-    "large": 16,       # axis labels, subplot titles
-    "title": 18,       # figure-level suptitle
-}
+FONT_SIZES: dict[str, int] = Defaults.FONT_SIZES
 
 # 特征提取器缓存 (使用配置哈希作为键, 避免重复初始化开销)
 _AUTH_FE_CACHE: dict[int, FeatureExtractor] = {}
@@ -89,7 +84,7 @@ def clean_title(ax: plt.Axes) -> str:
 def save_experiment_figure(
     fig: plt.Figure, 
     exp_name: str, 
-    output_dir: Path | str = "results/figures"
+    output_dir: Path | str = Defaults.FIGURE_OUTPUT_DIR,
 ) -> Path:
     """保存整张实验图到指定目录, 文件名包含实验名和时间戳。"""
     out_dir = Path(output_dir)
@@ -102,7 +97,7 @@ def save_experiment_figure(
 def save_experiment_subfigures(
     fig: plt.Figure, 
     exp_name: str, 
-    output_dir: Path | str = "results/figures"
+    output_dir: Path | str = Defaults.FIGURE_OUTPUT_DIR,
 ) -> list[Path]:
     """将组合图中的每个子图分别保存为独立文件。
     遍历 Figure 的所有 Axes, 逐个隐藏其余子图后以 tight bbox 保存。
@@ -175,8 +170,8 @@ def find_processed_file(
 
 def slice_rssi(
     data: np.ndarray, 
-    slice_duration_s: float = 5.0, 
-    sample_rate: float = 100.0
+    slice_duration_s: float = Defaults.SLICE_DURATION_S, 
+    sample_rate: float = Defaults.RSSI_SAMPLE_RATE
 ) -> list[np.ndarray]:
     """将长时 RSSI 样本切分为短时切片。
     

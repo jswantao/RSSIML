@@ -16,7 +16,8 @@ _logger = _logging.getLogger(__name__)
 MODEL_VERSION = "2.0"
 
 # ── 配置 ─────────────────────────────────────────────────────────────
-from scripts.models.config import SVMConfig, CNNConfig, CNNTrainConfig
+from scripts.models.config import SVMConfig, CNNTrainConfig
+from scripts.models.cnn.models import CNNConfig
 
 # ── 基础工具 (指标计算、阈值、评估) ──────────────────────────────────
 from scripts.models.base import MetricsCalculator, evaluate_authentication, compute_threshold

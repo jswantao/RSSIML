@@ -18,7 +18,8 @@ import numpy as np
 
 from scripts.config import PipelineConfig
 from scripts.models.cnn.models import RSSICNNBinaryClassifier, CNNAuthenticationModel
-from scripts.models.config import CNNConfig
+from scripts.models.cnn.models import CNNConfig
+from scripts.models.config import CNNTrainConfig
 from scripts.models.base import evaluate_authentication
 
 logger = logging.getLogger(__name__)
@@ -30,19 +31,6 @@ try:
     _TORCH_AVAILABLE = True
 except ImportError:
     _TORCH_AVAILABLE = False
-
-
-@dataclass
-class CNNTrainConfig:
-    """CNN 训练超参数。"""
-    epochs: int = 20
-    batch_size: int = 64
-    learning_rate: float = 0.001
-    weight_decay: float = 1e-4
-    threshold_method: str = "youden"
-    random_seed: int = 42
-    gradient_accumulation_steps: int = 1
-    use_amp: bool = True
 
 
 class CNNTrainer:
@@ -228,96 +216,3 @@ class CNNTrainer:
             "training_duration": train_dur,
             "checkpoint_path": checkpoint_path,
         }
-
-
-class CNNInference:
-    """CNN 推理引擎 — 从检查点加载模型并执行推理。
-
-    属性:
-        is_authentication: 检查点是否为认证模型 (含 subjects + thresholds)。
-        subjects: 注册用户列表。
-        thresholds: 用户阈值字典。
-    """
-
-    def __init__(self, model_path: Path | str):
-        if not _TORCH_AVAILABLE:
-            raise ImportError("PyTorch 不可用")
-        self.model_path = Path(model_path)
-        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        self._checkpoint: dict | None = None
-        self._models: dict[str, RSSICNNBinaryClassifier] = {}
-        self._loaded = False
-
-    def load(self) -> None:
-        """加载检查点并重建模型。"""
-        self._checkpoint = torch.load(
-            self.model_path, map_location=self.device, weights_only=False,
-        )
-        logger.info("CNN 检查点已加载: %s", self.model_path)
-
-        # 重建模型
-        state_dicts = self._checkpoint.get("state_dicts", {})
-        model_cfg = self._checkpoint.get("model_cfg", CNNConfig())
-        n_channels = self._checkpoint.get("input_channels", 0)
-
-        for subj, sd in state_dicts.items():
-            model = RSSICNNBinaryClassifier(
-                input_channels=n_channels,
-                num_classes=1,
-                config=model_cfg,
-            ).to(self.device)
-            model.load_state_dict(sd)
-            model.eval()
-            self._models[subj] = model
-
-        self._loaded = True
-        logger.info("重建 %d 个用户 CNN 模型", len(self._models))
-
-    def _ensure_loaded(self) -> None:
-        if not self._loaded:
-            self.load()
-
-    def predict(self, features: np.ndarray, subject: str) -> np.ndarray:
-        """对指定用户执行推理。
-
-        Args:
-            features: (N, C, W) 窗口数据。
-            subject: 待验证的用户 ID。
-
-        Returns:
-            (N,) sigmoid 概率分数。
-        """
-        self._ensure_loaded()
-
-        if subject not in self._models:
-            logger.warning("用户 %s 不在检查点中", subject)
-            return np.zeros(features.shape[0])
-
-        model = self._models[subject]
-        x_tensor = torch.from_numpy(np.asarray(features, dtype=np.float32)).to(self.device)
-        with torch.no_grad():
-            logits = model(x_tensor).cpu().numpy().squeeze(-1)
-
-        return 1.0 / (1.0 + np.exp(-logits.astype(np.float64)))
-
-    @property
-    def is_authentication(self) -> bool:
-        """是否为认证模型检查点。"""
-        self._ensure_loaded()
-        return bool(self._checkpoint.get("subjects"))
-
-    @property
-    def subjects(self) -> list[str]:
-        self._ensure_loaded()
-        return self._checkpoint.get("subjects", [])
-
-    @property
-    def thresholds(self) -> dict[str, float]:
-        self._ensure_loaded()
-        return self._checkpoint.get("thresholds", {})
-
-    @property
-    def verifiers(self) -> dict[str, RSSICNNBinaryClassifier]:
-        """返回重建的模型字典 (兼容 AuthenticationModel 接口)。"""
-        self._ensure_loaded()
-        return self._models

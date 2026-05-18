@@ -1,3 +1,4 @@
+from scripts.config import Defaults
 # -*- coding: utf-8 -*-
 """E4: 模型性能对比实验 — SVM vs CNN 认证性能对比。"""
 import gc
@@ -16,13 +17,13 @@ def run_e4(self):
     t0 = time.time()
     r_svm = self._run_svm(
         cross_activity=False,
-        seed=42,
-        test_size=0.2,
-        window_size=200,
-        step_size=100,
+        seed=Defaults.SEED,
+        test_size=Defaults.TEST_SIZE,
+        window_size=Defaults.WINDOW_SIZE,
+        step_size=Defaults.STEP_SIZE,
         max_files_per_subject=100,
-        threshold_method="youden",
-        cv_folds=5,
+        threshold_method=Defaults.THRESHOLD_METHOD,
+        cv_folds=Defaults.CV_FOLDS,
         use_online_svm=True,
         online_kernel="linear",
         csi_denoise="butterworth",

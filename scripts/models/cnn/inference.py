@@ -18,7 +18,7 @@ from scripts.models.cnn.models import (
     prepare_cnn_input,
     RSSICNNBinaryClassifier,
 )
-from scripts.models.config import CNNConfig
+from scripts.models.cnn.models import CNNConfig
 from scripts.models import MODEL_VERSION
 
 logger = logging.getLogger(__name__)

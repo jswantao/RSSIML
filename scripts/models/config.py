@@ -31,34 +31,7 @@ class SVMConfig:
                 f"search_method 必须是 'grid' 或 'random'")
 
 
-@dataclass(frozen=True)
-class CNNConfig:
-    """CNN 模型结构配置。"""
-    conv_channels: tuple[int, ...] = (64, 128, 256, 512)
-    kernel_size: int = 5
-    padding: int = 3
-    hidden_units: int = 512
-    dropout_rates: tuple[float, float] = (0.3, 0.5)
-    window_size: int = 200
-    use_batch_norm: bool = True
-    activation: str = "relu"
-    # 新增：模型压缩选项
-    use_depthwise: bool = False  # 使用深度可分离卷积减少参数
-    use_checkpoint: bool = True   # 梯度检查点 (省显存, 牺牲 ~40% 训练速度)
-
-    def __post_init__(self) -> None:
-        if self.kernel_size % 2 == 0:
-            raise ValueError("kernel_size 必须为奇数")
-        if self.activation not in ("relu", "gelu", "leaky_relu"):
-            raise ValueError(f"activation 无效: {self.activation}")
-
-    def with_window_size(self, ws: int) -> "CNNConfig":
-        return CNNConfig(
-            self.conv_channels, self.kernel_size, self.padding,
-            self.hidden_units, self.dropout_rates, ws,
-            self.use_batch_norm, self.activation, self.use_depthwise,
-        )
-
+# CNNConfig 定义在 scripts.models.cnn.models 中，避免重复
 
 @dataclass(frozen=True)
 class CNNTrainConfig:

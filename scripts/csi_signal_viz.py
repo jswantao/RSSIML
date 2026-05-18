@@ -15,17 +15,18 @@ import matplotlib.pyplot as plt
 import numpy as np
 from scipy.signal import butter, sosfiltfilt, welch
 
-_FS = 100.0        # CSI 采样率 (Hz)
-_CUTOFF = 20.0     # Butterworth 截止频率 (Hz)
-_ORDER = 4          # 滤波器阶数
+_FS = Defaults.CSI_SAMPLE_RATE
+_CUTOFF = Defaults.CSI_BUTTERWORTH_CUTOFF_HZ
+_ORDER = Defaults.CSI_BUTTERWORTH_ORDER
 _WIN_S = 3.0        # 滑动窗口时长 (s)
 _OVERLAP = 0.5      # 窗口重叠比例
-_OUT_DIR = Path("results/figures")
+_OUT_DIR = Path(Defaults.FIGURE_OUTPUT_DIR)
+from scripts.config import Defaults, PipelineConfig
 from scripts.app_utils import FONT_SIZES as _FONT
 
 # CSI 用户映射: UI 编号 → 磁盘编号 (1→12, ..., 19→30)
-_CSI_DISK_OFFSET = 11
-_CSI_DIR = Path("WiFi")
+_CSI_DISK_OFFSET = Defaults.CSI_DISK_OFFSET
+_CSI_DIR = PipelineConfig.from_root().npy_dir
 
 
 def _setup_style():
