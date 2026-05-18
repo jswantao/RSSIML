@@ -29,7 +29,7 @@ from typing import Any, Literal
 import numpy as np
 
 from scripts.config import PipelineConfig
-from scripts.data_loader import DataFormatError, DataLoadContext, load_npy_matrix
+from scripts.data_loader import DataFormatError, DataLoadContext, load_npy_matrix, parse_npy_filename
 
 logger = logging.getLogger(__name__)
 
@@ -231,11 +231,8 @@ class DatasetSplitter:
 
     @staticmethod
     def _parse_csi_filename(file_path: Path) -> tuple[str, int]:
-        """安全解析 CSI 文件名 {subject}_{activity}_{trial}.npy"""
-        parts = file_path.stem.split("_")
-        if len(parts) != 3:
-            raise ValueError(f"CSI 文件名格式异常: {file_path.name}")
-        return parts[0], int(parts[1]) * 100 + int(parts[2])
+        """解析 CSI 文件名 — 委托给共享的 parse_npy_filename。"""
+        return parse_npy_filename(file_path)
 
     def _limit_per_subject(self, samples: list[Sample], limit: int) -> list[Sample]:
         if self.data_source == "csi":
@@ -376,15 +373,23 @@ class DatasetSplitter:
 
             # CSI 保留 Path 引用；RSSI 立即解析
             is_csi = self.data_source == "csi"
-            for role, target_dict in [("train", user_train), ("genuine", user_genuine)]:
-                slice_idx = indices[:n_test] if role == "genuine" else indices[n_test:]
-                samples = [group[i] for i in slice_idx]
-                resolved = [
-                    s.to_dict() if is_csi
-                    else {**s.to_dict(), "data": self._resolve_data(s)}
-                    for s in samples
-                ]
-                target_dict[subj] = resolved
+            # 训练集
+            train_indices = indices[n_test:]
+            train_samples = [group[i] for i in train_indices]
+            user_train[subj] = [
+                s.to_dict() if is_csi
+                else {**s.to_dict(), "data": self._resolve_data(s)}
+                for s in train_samples
+            ]
+            # 测试集 genuine (必须标注 claimed_identity 和 true_label)
+            test_indices = indices[:n_test]
+            test_samples = [group[i] for i in test_indices]
+            user_genuine[subj] = [
+                {**(s.to_dict() if is_csi
+                   else {**s.to_dict(), "data": self._resolve_data(s)}),
+                 "claimed_identity": subj, "true_label": "genuine"}
+                for s in test_samples
+            ]
 
         train_all = [s for samples in user_train.values() for s in samples]
         auth_test = self._build_auth_test(subjects, user_train, user_genuine, impostor_ratio)

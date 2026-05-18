@@ -1,10 +1,12 @@
-from scripts.config import Defaults
 # -*- coding: utf-8 -*-
 """E4: 模型性能对比实验 — SVM vs CNN 认证性能对比。"""
+from __future__ import annotations
+
 import gc
 import time
 
 from scripts.models import clear_gpu_memory
+from scripts.config import Defaults
 
 
 def run_e4(self):

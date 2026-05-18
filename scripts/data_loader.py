@@ -340,7 +340,7 @@ def _collect_files(directory: Path, pattern: str, recursive: bool) -> list[Path]
 # ══════════════════════════════════════════════════════════════════════
 # MAT (RSSI) — 5 用户 × 4 会话
 # ══════════════════════════════════════════════════════════════════════
-MAT_PATTERN = re.compile(r"^wipin([A-Za-z0-9]+)(\d+).mat$")
+MAT_PATTERN = re.compile(r"^wipin_([A-Za-z0-9]+)(\d+)\.mat$")
 
 
 def load_rssi_data(

@@ -143,8 +143,8 @@ def _butterworth_filter(data: np.ndarray, cutoff: float = 0.4,
                         order: int = 4) -> np.ndarray:
     """巴特沃斯低通滤波器 — 保留低频运动信息, 抑制高频噪声。
 
-    CSI 人体运动信息集中在 30Hz 以下, 采样率 100Hz 时
-    cutoff=0.4 → 20Hz 截止, 有效滤除高频硬件噪声。
+    CSI 人体运动信息集中在 30Hz 以下, 采样率 200Hz 时
+    cutoff=0.2 → 20Hz 截止, 有效滤除高频硬件噪声。
 
     Args:
         data: (n_timesteps, n_subcarriers) float32。
@@ -164,15 +164,17 @@ def _butterworth_filter(data: np.ndarray, cutoff: float = 0.4,
 
 def _apply_csi_denoise(arr: np.ndarray, method: str | None) -> np.ndarray:
     """根据配置对 CSI 原始信号 (n_timesteps, n_subcarriers) 降噪。"""
-    if method is None:
-        return arr
-    if method == "hampel":
-        return _hampel_filter(arr)
-    if method == "savgol":
-        return _savgol_filter(arr)
-    if method == "butterworth":
-        return _butterworth_filter(arr)
-    return arr
+    match method:
+        case None:
+            return arr
+        case "hampel":
+            return _hampel_filter(arr)
+        case "savgol":
+            return _savgol_filter(arr)
+        case "butterworth":
+            return _butterworth_filter(arr)
+        case _:
+            raise ValueError(f"未知降噪方法: {method!r}, 支持: hampel, savgol, butterworth")
 
 
 def _current_exception() -> str:
@@ -591,10 +593,6 @@ class DataPipeline:
             stage_times["features"] = time.time() - t3
             logger.info(f"特征提取完成 ({stage_times['features']:.1f}s)")
         
-        memory_usage = 0.0
-        if hasattr(self, '_get_memory_usage'):
-            memory_usage = self._get_memory_usage() # type: ignore[attr-defined]
-        
         elapsed = time.time() - t0
         logger.info(f"数据流水线完成 ({elapsed:.1f}s)")
         
@@ -606,7 +604,7 @@ class DataPipeline:
             proc_f if not skip_features else None,
             elapsed_s=elapsed,
             stage_times=stage_times,
-            memory_usage_mb=memory_usage,
+            memory_usage_mb=0.0,
         )
 
 
@@ -804,7 +802,7 @@ class DataCoordinator:
         merged_feats, merged_labels = [], []
         n_done = 0
 
-        max_workers = min(8, (getattr(self, 'pcfg', None) is not None and 8) or 4)
+        max_workers = 8
         with ThreadPoolExecutor(max_workers=max_workers) as ex:
             futures = {ex.submit(self._process_one_sample, s, wb, fe): i
                       for i, s in enumerate(samples)}
@@ -883,32 +881,33 @@ class DataCoordinator:
         shape = (total_windows, n_channels, self.window_size)
         logger.info(f"  [{name}] 创建内存映射文件: {mmap_path} ({shape})")
         mmap = np.memmap(mmap_path, dtype=np.float32, mode='w+', shape=shape)
-        write_pos = 0
-        for i, s in enumerate(samples):
-            if (i + 1) % _CSI_LOG_INTERVAL_CNN == 0 or i == 0:
-                logger.debug(f"  [{name}] 写入: {i + 1}/{total} → {write_pos}/{total_windows}")
-            raw = s.get("data")
-            if raw is None: continue
-            if isinstance(raw, Path):
-                try: arr = load_npy_matrix(raw)
-                except (ValueError, OSError): continue
-            else: arr = np.asarray(raw, dtype=np.float32)
-            if arr.ndim != 2: continue
-            # CSI 原始信号降噪 (窗口构建前, 保留完整时间上下文)
-            denoise_method = self._p._csi_denoise or self._p.pcfg.csi_denoise
-            arr = _apply_csi_denoise(arr, denoise_method)
-            windows = wb.build(arr)
-            if windows.shape[0] == 0: continue
-            # wb.build 返回 (n, n_subcarriers, window_size)
-            # memmap shape 同为 (total, n_subcarriers, window_size) → 直接写入
-            mmap[write_pos:write_pos + windows.shape[0]] = windows
-            write_pos += windows.shape[0]
-
-        mmap.flush()
-        # 显式释放 memmap, 避免 Windows 文件锁阻止后续 mode='r+' 打开
-        if hasattr(mmap, '_mmap'):
-            mmap._mmap.close()
-        del mmap
+        try:
+            write_pos = 0
+            for i, s in enumerate(samples):
+                if (i + 1) % _CSI_LOG_INTERVAL_CNN == 0 or i == 0:
+                    logger.debug(f"  [{name}] 写入: {i + 1}/{total} → {write_pos}/{total_windows}")
+                raw = s.get("data")
+                if raw is None: continue
+                if isinstance(raw, Path):
+                    try: arr = load_npy_matrix(raw)
+                    except (ValueError, OSError): continue
+                else: arr = np.asarray(raw, dtype=np.float32)
+                if arr.ndim != 2: continue
+                # CSI 原始信号降噪 (窗口构建前, 保留完整时间上下文)
+                denoise_method = self._p._csi_denoise or self._p.pcfg.csi_denoise
+                arr = _apply_csi_denoise(arr, denoise_method)
+                windows = wb.build(arr)
+                if windows.shape[0] == 0: continue
+                # wb.build 返回 (n, n_subcarriers, window_size)
+                # memmap shape 同为 (total, n_subcarriers, window_size) → 直接写入
+                mmap[write_pos:write_pos + windows.shape[0]] = windows
+                write_pos += windows.shape[0]
+            mmap.flush()
+        finally:
+            # 显式释放 memmap, 避免 Windows 文件锁阻止后续 mode='r+' 打开
+            if hasattr(mmap, '_mmap'):
+                mmap._mmap.close()
+            del mmap
         logger.info(f"  [{name}] 写入完成: {write_pos} 窗口 → {mmap_path}")
         return mmap_path, np.array(all_labels, dtype=object), total_windows, n_channels
 

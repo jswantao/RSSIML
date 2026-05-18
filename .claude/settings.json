@@ -149,12 +149,29 @@
       "Bash(git add *)",
       "Bash(git rm *)",
       "Bash(git commit -m ' *)",
-      "Bash(git remote *)"
+      "Bash(git remote *)",
+      "Bash(python scripts/inspect_data.py)",
+      "Bash(python -m py_compile scripts/models/training_log.py)",
+      "Bash(python -m py_compile scripts/models/cnn/utils.py)",
+      "Bash(python -m py_compile scripts/models/base.py)",
+      "Bash(python -m py_compile scripts/csi_feature_viz.py)",
+      "Bash(python -m py_compile scripts/inspect_data.py)",
+      "Bash(python -m py_compile app/state.py)",
+      "Bash(python -m py_compile app/ui.py)",
+      "Bash(python -m py_compile app/auth.py)",
+      "Bash(python -m py_compile app/executor.py)",
+      "Bash(python -m py_compile app/__init__.py)",
+      "Bash(python -c \"from app.state import SessionStateManager; from app.ui import TrainingOperationUI; from app.auth import load_svm_model; from app.executor import BasicTrainingExecutor; print\\('All imports OK, no circular deps'\\)\")",
+      "Bash(python -m py_compile scripts/csi_utils.py)",
+      "Bash(python scripts/csi_signal_viz.py --subject 1 --actions 10)",
+      "Bash(PYTHONPATH=\".\" python scripts/csi_signal_viz.py --subject 1 --actions 10)",
+      "Bash(cd \"g:/Desktop/WiFiML\" && rm -f data/rssi_split_* data/rssi_windowed_* data/rssi_processed_* && echo \"Split cache cleared\" && python -m py_compile app_auth.py && echo \"app_auth OK\")"
     ],
     "additionalDirectories": [
       "g:\\Desktop\\WiFiML\\cache",
       "G:\\Desktop\\WiFiML\\cache",
-      "g:\\Desktop\\WiFiML\\results\\figures"
+      "g:\\Desktop\\WiFiML\\results\\figures",
+      "G:\\Desktop\\WiFiML\\data"
     ]
   }
 }

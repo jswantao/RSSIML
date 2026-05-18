@@ -154,7 +154,12 @@ class SVMAuthenticationTrainer:
                     for i in range(len(subjects))
                 }
             for fut in as_completed(futures):
-                subj_name, verifier, threshold, info = fut.result()
+                try:
+                    subj_name, verifier, threshold, info = fut.result()
+                except Exception as exc:
+                    logger.warning("验证器训练失败 (用户 %s): %s",
+                                   subjects[futures[fut]], exc)
+                    continue
                 if verifier is not None:
                     verifiers[subj_name] = verifier
                     thresholds[subj_name] = threshold

@@ -1,10 +1,12 @@
 # -*- coding: utf-8 -*-
 """实验基础设施 — 共享的流水线构建、训练执行和切片评估。"""
-import gc
+from __future__ import annotations
+
 import logging
 import pickle
+from collections.abc import Callable
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any
 
 import numpy as np
 from scipy.io import loadmat
@@ -88,26 +90,19 @@ class BaseExperimentRunner:
             cancel_fn=self._check_cancelled,
         )
 
-    def _compute_continuous_auth(self, result, smooth_window=Defaults.CONTINUOUS_AUTH_SMOOTH_WINDOW):
-        """持续认证评估 
-
-        
-          1. 加载原始 RSSI (匹配验证器所属用户)
-          2. `_build_windows(raw)` → 滑动窗口 (ws=200, ss=100, 与推理一致)
-          3. `_extract_features_for_auth(windows, ...)` → 逐窗口特征
-          4. `svm_scores(verifier, feats)` → 逐窗口评分
-          5. 前向滑动平均 `smoothed[i]=mean(scores[max(0,i-ws+1):i+1])`
-          6. `smoothed >= threshold` → 逐窗口判定
-          7. 汇总: 接受率 / 最终决策 / 最长连续接受 / 切换次数 / 总窗口数
+    def _compute_continuous_auth(self, result, smooth_window=Defaults.CONTINUOUS_AUTH_SMOOTH_WINDOW,
+                                 subj=None):
+        """持续认证评估 — 与推理阶段 `_render_continuous_auth` 完全一致。
 
         Args:
             result: SVM 训练结果 dict (含 model, verifiers, thresholds)。
-            smooth_window: 滑动平均窗口, 默认 10 (与推理阶段 `ws_cont` 默认一致)。
+            smooth_window: 滑动平均窗口, 默认 10。
+            subj: 指定用户, None 则使用第一个 verifier。
 
         Returns:
             dict 含全部窗口级结果和汇总指标, 或 {}。
         """
-        ctx = self._prepare_auth_context(result)
+        ctx = self._prepare_auth_context(result, subj=subj)
         if ctx is None:
             return {}
 

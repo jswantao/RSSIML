@@ -1,12 +1,14 @@
-from scripts.config import Defaults
 # -*- coding: utf-8 -*-
 """E2: RSSI 持续认证实验 — 完整复现基础训练→推理阶段的全流程。"""
+from __future__ import annotations
+
 import numpy as np
 import pandas as pd
 import streamlit as st
 import matplotlib.pyplot as plt
 
 from scripts.app_utils import FONT_SIZES as FS, save_experiment_subfigures, setup_paper_style
+from scripts.config import Defaults
 
 
 def run_e2(self):
@@ -35,66 +37,21 @@ def run_e2(self):
         self.results["E2"] = {}
         return {}
 
-    # ── 阶段2: 持续认证 (逐用户, 与推理阶段完全一致) ──────────────
+    # ── 阶段2: 持续认证 (复用 base._compute_continuous_auth) ─────
     self.logger.info(f"持续认证: {len(verifiers)} 用户, 平滑窗口=10 (推理默认)...")
 
     per_user = {}
     for subj in sorted(verifiers.keys(), key=int):
         self._check_cancelled()
         self.logger.info(f"  用户 {subj} 持续认证...")
-        ctx = self._prepare_auth_context(r, subj=subj)
-        if ctx is None:
+        # 直接复用 base._compute_continuous_auth (与推理阶段完全一致)
+        entry = self._compute_continuous_auth(r, subj=subj)
+        if not entry:
             self.logger.warning(f"  用户 {subj} 数据加载失败, 跳过")
             continue
-
-        _, verifier, threshold, pca, scaler, fc, fd, raw = ctx
-
-        # 与推理阶段 _render_continuous_auth 完全一致的逻辑
-        from scripts.app_utils import build_windows, extract_features_for_auth
-        from scripts.models import svm_scores
-
-        windows = build_windows(raw)
-        n = windows.shape[0]
-        if n < 2:
-            per_user[subj] = {"用户": subj, "总窗口数": n, "错误": "窗口不足"}
-            continue
-
-        feats = extract_features_for_auth(
-            windows, pca, scaler, fc, feature_dim=fd)
-        all_scores = svm_scores(verifier, feats)
-
-        # 滑动平均 (与推理阶段 ws=10 完全一致)
-        smooth_ws = 10
-        smoothed = np.array([
-            np.mean(all_scores[max(0, i - smooth_ws + 1):i + 1])
-            for i in range(n)
-        ])
-        decisions = smoothed >= threshold
-
-        # 统计 (与推理阶段完全一致)
-        longest = streak = 0
-        for d in decisions:
-            if d:
-                streak += 1
-                longest = max(longest, streak)
-            else:
-                streak = 0
-        switches = sum(1 for i in range(1, n)
-                       if decisions[i] != decisions[i - 1])
-
-        per_user[subj] = {
-            "用户": subj,
-            "总窗口数": n,
-            "接受率": float(np.mean(decisions)),
-            "最终决策": "接受" if decisions[-1] else "拒绝",
-            "最长连续接受": longest,
-            "状态切换次数": switches,
-            "阈值": float(threshold),
-            "HTER_train": sm.get("user_metrics", {}).get(subj, {}).get("hter", None),
-            "原始分数": all_scores.tolist() if n <= 2000 else all_scores[:2000].tolist(),
-            "平滑分数": smoothed.tolist() if n <= 2000 else smoothed[:2000].tolist(),
-            "决策序列": [int(d) for d in decisions],
-        }
+        # 补充模型级 HTER (超出 _compute_continuous_auth 的范围)
+        entry["HTER_train"] = sm.get("user_metrics", {}).get(subj, {}).get("hter")
+        per_user[subj] = entry
 
     self.results["E2"] = {
         "system": sm,

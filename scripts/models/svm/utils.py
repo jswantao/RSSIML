@@ -6,9 +6,6 @@ import numpy as np
 from sklearn.svm import SVC, LinearSVC
 from sklearn.exceptions import ConvergenceWarning
 
-# LinearSVC 在认证场景中不要求训练损失完全收敛, 阈值决策对轻微欠拟合不敏感
-warnings.filterwarnings("ignore", category=ConvergenceWarning)
-
 from scripts.models.base import compute_threshold
 
 logger = logging.getLogger(__name__)
@@ -66,7 +63,9 @@ def _train_single_verifier(idx, subject, y_enc, x, cfg):
             class_weight="balanced", cache_size=200,
             random_state=cfg.random_seed,
         )
-    v.fit(x_tr, y_tr)
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", ConvergenceWarning)
+        v.fit(x_tr, y_tr)
 
     pos = svm_scores(v, x_tr[y_tr == 1])
     if n_neg_used > 0:

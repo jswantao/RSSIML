@@ -20,7 +20,7 @@ from scripts.config import PipelineConfig
 from scripts.models.cnn.models import RSSICNNBinaryClassifier, CNNAuthenticationModel
 from scripts.models.cnn.models import CNNConfig
 from scripts.models.config import CNNTrainConfig
-from scripts.models.base import evaluate_authentication
+from scripts.models.base import compute_threshold, evaluate_authentication
 
 logger = logging.getLogger(__name__)
 
@@ -160,6 +160,16 @@ class CNNTrainer:
                     epoch_loss += loss.item() * tc.gradient_accumulation_steps
                     n_batches += 1
 
+                # 处理梯度累积的余数批次
+                remainder = n_batches % tc.gradient_accumulation_steps
+                if remainder != 0:
+                    if scaler is not None:
+                        scaler.step(optimizer)
+                        scaler.update()
+                    else:
+                        optimizer.step()
+                    optimizer.zero_grad()
+
                 if epoch % 5 == 0 or epoch == tc.epochs - 1:
                     logger.info(
                         "  用户 %s epoch %d/%d loss=%.4f",
@@ -171,11 +181,17 @@ class CNNTrainer:
             verifiers[subj] = model
             state_dicts[subj] = model.state_dict()
 
-            # 计算阈值: 对训练数据执行推理取 genuine 概率中位数
+            # 计算阈值: 使用配置的阈值方法 (默认 youden)
             with torch.no_grad():
                 all_logits = model(x_tensor).cpu().numpy().squeeze(-1)
                 all_probs = 1.0 / (1.0 + np.exp(-all_logits))
-            thresholds[subj] = float(np.median(all_probs[genuine_mask]))
+            pos_scores = all_probs[genuine_mask]
+            neg_scores = all_probs[~genuine_mask]
+            if len(neg_scores) > 0:
+                t, _ = compute_threshold(pos_scores, neg_scores, method=tc.threshold_method)
+            else:
+                t = float(np.median(pos_scores))
+            thresholds[subj] = t
 
         train_dur = time.time() - t0
         logger.info("CNN 训练完成: %d 用户, 耗时 %.1fs", len(verifiers), train_dur)

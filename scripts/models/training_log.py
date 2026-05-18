@@ -1,12 +1,12 @@
 # -*- coding: utf-8 -*-
 """训练日志 — JSONL 格式，每次训练成功/失败/取消均记录一条。"""
+from __future__ import annotations
+
 import json
 import time
 import datetime
 import logging
 from pathlib import Path
-from typing import Optional
-
 logger = logging.getLogger(__name__)
 
 
@@ -16,11 +16,11 @@ def log_training(
     task_type: str,
     data_source: str,
     status: str,  # "success" | "failed" | "cancelled"
-    duration: Optional[float] = None,
-    config: Optional[dict] = None,
-    metrics: Optional[dict] = None,
-    error: Optional[str] = None,
-    pipeline_config: Optional["PipelineConfig"] = None,
+    duration: float | None = None,
+    config: dict | None = None,
+    metrics: dict | None = None,
+    error: str | None = None,
+    pipeline_config: PipelineConfig | None = None,
 ) -> None:
     """记录一条训练日志 (JSONL 追加)。
 

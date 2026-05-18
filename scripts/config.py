@@ -318,16 +318,29 @@ class Defaults:
 
     # ── 切片认证 ──────────────────────────────────────────────────────
     SLICE_DURATION_S: float = 5.0
+    SLICE_DURATIONS: tuple[int, ...] = (3, 5, 10, 20)         # E5 实验切片时长
     RSSI_SAMPLE_RATE: float = 100.0
 
     # ── CSI 信号处理 ──────────────────────────────────────────────────
-    CSI_SAMPLE_RATE: float = 100.0
+    CSI_SAMPLE_RATE: float = 200.0
     CSI_DISK_OFFSET: int = 11          # UI 用户编号 → 磁盘编号偏移 (1→12)
     CSI_BUTTERWORTH_CUTOFF_HZ: float = 20.0
     CSI_BUTTERWORTH_ORDER: int = 4
 
-    # ── 可视化 ────────────────────────────────────────────────────────
-    FONT_SIZES: dict = {
+    # ── E4 模型对比 (CNN 速度优化配置) ─────────────────────────────────
+    E4_CNN_EPOCHS: int = 10
+    E4_CNN_BATCH_SIZE: int = 96
+    E4_CNN_USE_CHECKPOINT: bool = False
+    E4_CNN_GRADIENT_ACCUMULATION_STEPS: int = 1
+    E4_CNN_CONV_CHANNELS: tuple[int, ...] = (32, 64, 128, 192)
+    E4_CNN_HIDDEN_UNITS: int = 256
+
+    # ── CSI 可视化 ────────────────────────────────────────────────────
+    CSI_VIZ_WINDOW_S: float = 3.0      # 滑动窗口时长 (s)
+    CSI_VIZ_OVERLAP: float = 0.5        # 窗口重叠比例
+
+    # ── 图表样式 ──────────────────────────────────────────────────────
+    FONT_SIZES: dict[str, int] = {
         "small": 14,
         "normal": 15,
         "large": 16,

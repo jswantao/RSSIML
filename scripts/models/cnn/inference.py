@@ -91,14 +91,16 @@ class CNNInference:
         """分批推理, 模型按需移至 GPU, 推理后放回 CPU 释放显存。"""
         v = self.verifiers[claimed]
         v.to(self.device)
-        n = len(x)
-        scores = np.empty(n, dtype=np.float32)
-        for start in range(0, n, batch_size):
-            end = min(start + batch_size, n)
-            xt = prepare_cnn_input(x[start:end], self.device)
-            scores[start:end] = v.predict_proba(xt)
-        v.cpu()
-        if self.device.type == 'cuda':
-            torch.cuda.empty_cache()
+        try:
+            n = len(x)
+            scores = np.empty(n, dtype=np.float32)
+            for start in range(0, n, batch_size):
+                end = min(start + batch_size, n)
+                xt = prepare_cnn_input(x[start:end], self.device)
+                scores[start:end] = v.predict_proba(xt)
+        finally:
+            v.cpu()
+            if self.device.type == 'cuda':
+                torch.cuda.empty_cache()
         accept_rate = np.mean(scores >= self.thresholds[claimed])
         return (accept_rate >= 0.5, float(np.mean(scores)), scores)

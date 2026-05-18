@@ -1,5 +1,7 @@
 # -*- coding: utf-8 -*-
 """基础训练工具 — 指标计算、阈值、认证评估。"""
+from __future__ import annotations
+
 import logging
 import numpy as np
 from sklearn.metrics import accuracy_score, f1_score, precision_score, recall_score
@@ -55,15 +57,14 @@ def compute_threshold(
     if len(pos_scores) == 0:
         return 0.5, {"method": "fallback", "reason": "no_positive_samples"}
 
-    if method == "fixed":
-        return 0.5, {"method": "fixed"}
-
-    if method == "quantile":
-        t = float(np.quantile(pos_scores, 1.0 - quantile))
-        return t, {"method": "quantile", "quantile": quantile}
-
-    if method == "eer":
-        return _compute_eer_threshold(pos_scores, neg_scores)
+    match method:
+        case "fixed":
+            return 0.5, {"method": "fixed"}
+        case "quantile":
+            t = float(np.quantile(pos_scores, 1.0 - quantile))
+            return t, {"method": "quantile", "quantile": quantile}
+        case "eer":
+            return _compute_eer_threshold(pos_scores, neg_scores)
 
     best_t, best_j = 0.5, -1.0
     # 向量化: 广播比较替代逐阈值循环

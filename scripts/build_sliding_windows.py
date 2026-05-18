@@ -5,7 +5,7 @@
 利用 NumPy stride tricks 实现零拷贝视图操作。
 
 优化记录 (v3.1):
-- 🔴 彻底修复所有断词/拼写错误 (time_steps, window_size, data, ascontiguousarray 等)
+
 - 🔴 日志命名空间修正为 __name__，避免全局污染
 - 🟠 build_from_samples 引入 preallocate 模式，万级样本窗口构建 OOM 风险下降 60%+
 - 🟠 进度回调类型提示精确化: Callable[[int, int, int], None]

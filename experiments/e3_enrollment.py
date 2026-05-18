@@ -1,5 +1,7 @@
 # -*- coding: utf-8 -*-
 """E3: 注册时长影响实验 — 不同训练样本量下的认证性能学习曲线。"""
+from __future__ import annotations
+
 import numpy as np
 import pandas as pd
 import streamlit as st

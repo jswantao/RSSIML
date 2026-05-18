@@ -1,12 +1,14 @@
-from scripts.config import Defaults
 # -*- coding: utf-8 -*-
 """E1: CSI 单次认证实验 — 文件级随机划分, 同身份 vs 跨身份冒名攻击对比。"""
+from __future__ import annotations
+
 import numpy as np
 import pandas as pd
 import streamlit as st
 import matplotlib.pyplot as plt
 
 from scripts.app_utils import FONT_SIZES as FS, save_experiment_subfigures, setup_paper_style
+from scripts.config import Defaults
 
 
 def run_e1(self):

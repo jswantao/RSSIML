@@ -1,6 +1,7 @@
-from scripts.config import Defaults
 # -*- coding: utf-8 -*-
 """E5: RSSI 切片式单次认证实验 — 每切片独立认证, 汇总评估整体性能。"""
+from __future__ import annotations
+
 import numpy as np
 import pandas as pd
 import streamlit as st
@@ -8,6 +9,7 @@ import matplotlib.pyplot as plt
 
 from scripts.app_utils import FONT_SIZES as FS, save_experiment_subfigures, setup_paper_style
 from scripts.models import svm_scores
+from scripts.config import Defaults
 
 
 def run_e5(self):
