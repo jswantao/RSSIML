@@ -8,6 +8,10 @@
     runner.run_e1()
     print(runner.results)
 """
+from __future__ import annotations
+
+from typing import Any, Callable
+
 from experiments.base import BaseExperimentRunner
 from experiments.e1_csi import run_e1, render_e1_results
 from experiments.e2_rssi import run_e2, render_e2_results
@@ -16,9 +20,7 @@ from experiments.e4_compare import run_e4, render_e4_results
 from experiments.e5_rssi_slice import run_e5, render_e5_results
 
 
-class ExperimentRunner(
-    BaseExperimentRunner,
-):
+class ExperimentRunner(BaseExperimentRunner):
     """完整实验执行器 — 继承 Base + 各实验 Mixin。"""
 
     run_e1 = run_e1
